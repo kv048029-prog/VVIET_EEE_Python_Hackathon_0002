@@ -120,7 +120,49 @@ def watermark_video(video_path, out_path, wm_type, text_str, logo_file, opacity,
     # Performance limit processing to first 150 frames for interactive responsiveness
     frame_count = 0
     while cap.isOpened() and frame_count < 150:
-        ret, frame = cap.get()
+        def watermark_video(video_path, out_path, wm_type, text_str, logo_file, opacity, font_size, color_hex, position, cx, cy):
+    cap = cv2.VideoCapture(video_path)
+    width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps    = cap.get(cv2.CAP_PROP_FPS)
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
+    
+    logo_img = None
+    if wm_type == "Logo" and logo_file is not None:
+        logo_img = Image.open(logo_file).convert("RGBA")
+        scale_factor = font_size / 100.0
+        wm_w = int(width * 0.2 * scale_factor)
+        wm_h = int(logo_img.height * (wm_w / logo_img.width))
+        logo_img = logo_img.resize((wm_w, wm_h))
+        logo_img = apply_image_opacity(logo_img, opacity)
+
+    # Performance limit processing to first 150 frames for interactive responsiveness
+    frame_count = 0
+    while cap.isOpened() and frame_count < 150:
+        # FIX: Changed cap.get() to cap.read()
+        ret, frame = cap.read() 
+        if not ret:
+            break
+        
+        # Convert CV2 frame (BGR) to PIL (RGB)
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        pil_img = Image.fromarray(frame_rgb)
+        
+        # Re-use our robust Image Watermarking Pipeline
+        processed_pil = watermark_image(
+            pil_img, wm_type, text_str, logo_file, opacity, 
+            font_size, color_hex, 0, position, False, cx, cy
+        )
+        
+        # Back to Open CV Matrix format
+        frame_out = cv2.cvtColor(np.array(processed_pil), cv2.COLOR_RGB2BGR)
+        out.write(frame_out)
+        frame_count += 1
+        
+    cap.release()
+    out.release() 
+    ret, frame = cap.get()
         if not ret:
             break
         
